@@ -44,90 +44,16 @@ deploy-dev:
         name: build-war
         path: ./artifact
 
-    - name: Deploy to DEV Tomcat
+    - name: Cleanup old deployment on DEV
+      run: |
+        curl -s -u ${{ secrets.TOMCAT_USER_DEV }}:${{ secrets.TOMCAT_PASSWORD_DEV }} \
+        "http://${{ secrets.TOMCAT_HOST_DEV }}:8080/manager/text/undeploy?path=/TrainBook"
+
+    - name: Deploy new WAR to DEV
       run: |
         response=$(curl -s -w "%{http_code}" -u ${{ secrets.TOMCAT_USER_DEV }}:${{ secrets.TOMCAT_PASSWORD_DEV }} \
         -T ./artifact/*.war \
-        "http://${{ secrets.TOMCAT_HOST_DEV }}:8080/manager/text/deploy?path=/TrainBook/html&update=true")
-        echo "Tomcat response: $response"
-        if [[ "$response" != *200* ]]; then
-          echo "Deployment failed"
-          exit 1
-        fi
-
----
-
-# Deploy to TEST
-deploy-test:
-  runs-on: ubuntu-latest
-  needs: build
-  environment:
-    name: TEST
-  steps:
-    - name: Download build artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: build-war
-        path: ./artifact
-
-    - name: Deploy to TEST Tomcat
-      run: |
-        response=$(curl -s -w "%{http_code}" -u ${{ secrets.TOMCAT_USER_TEST }}:${{ secrets.TOMCAT_PASSWORD_TEST }} \
-        -T ./artifact/*.war \
-        "http://${{ secrets.TOMCAT_HOST_TEST }}:8080/manager/text/deploy?path=/TrainBook/html&update=true")
-        echo "Tomcat response: $response"
-        if [[ "$response" != *200* ]]; then
-          echo "Deployment failed"
-          exit 1
-        fi
-
----
-
-# Deploy to PRE-PROD
-deploy-preprod:
-  runs-on: ubuntu-latest
-  needs: build
-  environment:
-    name: PRE-PROD
-  steps:
-    - name: Download build artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: build-war
-        path: ./artifact
-
-    - name: Deploy to PRE-PROD Tomcat
-      run: |
-        response=$(curl -s -w "%{http_code}" -u ${{ secrets.TOMCAT_USER_PREPROD }}:${{ secrets.TOMCAT_PASSWORD_PREPROD }} \
-        -T ./artifact/*.war \
-        "http://${{ secrets.TOMCAT_HOST_PREPROD }}:8080/manager/text/deploy?path=/TrainBook/html&update=true")
-        echo "Tomcat response: $response"
-        if [[ "$response" != *200* ]]; then
-          echo "Deployment failed"
-          exit 1
-        fi
-
----
-
-# Deploy to PROD (requires approval)
-deploy-prod:
-  runs-on: ubuntu-latest
-  needs: build
-  environment:
-    name: PROD
-    url: http://${{ secrets.TOMCAT_HOST_PROD }}:8080/TrainBook/html
-  steps:
-    - name: Download build artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: build-war
-        path: ./artifact
-
-    - name: Deploy to PROD Tomcat
-      run: |
-        response=$(curl -s -w "%{http_code}" -u ${{ secrets.TOMCAT_USER_PROD }}:${{ secrets.TOMCAT_PASSWORD_PROD }} \
-        -T ./artifact/*.war \
-        "http://${{ secrets.TOMCAT_HOST_PROD }}:8080/manager/text/deploy?path=/TrainBook/html&update=true")
+        "http://${{ secrets.TOMCAT_HOST_DEV }}:8080/manager/text/deploy?path=/TrainBook&update=true")
         echo "Tomcat response: $response"
         if [[ "$response" != *200* ]]; then
           echo "Deployment failed"
