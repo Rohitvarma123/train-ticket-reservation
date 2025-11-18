@@ -1,13 +1,12 @@
-name: Build, Upload to Nexus & Deploy to Tomcat
+name: Build WAR with Maven and Deploy Java App + Upload to Nexus
 
 on:
   push:
-    branches:
-      - master
+    branches: [ "master" ]
   workflow_dispatch:
 
 jobs:
-  build-deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,14 +14,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Set up Java
-      - name: Set up JDK 17
+      # 2️⃣ Set up JDK 17
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 3️⃣ Create Maven settings.xml for Nexus Auth
+      # 3️⃣ Configure Maven settings.xml (IMPORTANT - FIXED)
       - name: Configure Maven settings.xml
         run: |
           mkdir -p ~/.m2
@@ -35,48 +34,50 @@ jobs:
                 <password>${{ secrets.NEXUS_PASSWORD }}</password>
               </server>
             </servers>
-
-            <mirrors>
-              <mirror>
-                <id>nexus</id>
-                <mirrorOf>*</mirrorOf>
-                <url>${{ secrets.NEXUS_URL }}/repository/maven-public/</url>
-              </mirror>
-            </mirrors>
           </settings>
           EOF
 
-      # 4️⃣ Build and Upload WAR to Nexus
-      - name: Build & Deploy to Nexus
-        run: mvn clean deploy -DskipTests
+      # 4️⃣ Build WAR
+      - name: Build with Maven
+        run: mvn clean package
 
-      # 5️⃣ Upload Artifact for Tomcat Deployment
-      - name: Upload WAR Artifact
+      # 5️⃣ Deploy WAR to Nexus (SNAPSHOTS)
+      - name: Deploy to Nexus SNAPSHOT Repo
+        run: mvn deploy -DskipTests
+
+      # 6️⃣ Upload WAR to GitHub artifact
+      - name: Upload WAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: build-war
           path: target/*.war
 
-      # 6️⃣ Download Artifact for Tomcat Deployment
-      - name: Download WAR for Tomcat
+      # 7️⃣ Download artifact before Tomcat deploy
+      - name: Download WAR artifact
         uses: actions/download-artifact@v4
         with:
           name: build-war
           path: ./artifact
 
-      # 7️⃣ Undeploy old App
-      - name: Remove old deployment in Tomcat
+      # 8️⃣ Undeploy old app from Tomcat
+      - name: Undeploy old version from Tomcat
         run: |
           curl -s -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
           "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/undeploy?path=/TrainBook"
 
-      # 8️⃣ Deploy new WAR to Tomcat
-      - name: Deploy WAR to Tomcat
+      # 9️⃣ Deploy new WAR to Tomcat
+      - name: Deploy new WAR to Tomcat
         run: |
-          response=$(curl -s -w "%{http_code}" \
-          -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
-          -T ./artifact/*.war \
-          "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/deploy?path=/TrainBook&update=true")
+          WAR_FILE=$(ls ./artifact/*.war)
+          echo "Deploying $WAR_FILE to Tomcat..."
 
-          echo "Tomcat response: $response"
-          [[ "$response" == *200* ]] || exit 1
+          response=$(curl -s -w "%{http_code}" \
+            -u "${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }}" \
+            -T "$WAR_FILE" \
+            "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/deploy?path=/TrainBook&update=true")
+
+          echo "Tomcat Response: $response"
+          if [[ "$response" != *200* ]]; then
+            echo "Deployment to Tomcat FAILED!"
+            exit 1
+          fi
