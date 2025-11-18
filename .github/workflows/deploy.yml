@@ -32,6 +32,13 @@ jobs:
           name: war-file
           path: ${{ env.WAR_FILE }}
 
+      - name: SonarQube Analysis
+        run: |
+         mvn sonar:sonar \
+         -Dsonar.projectKey=train-ticket-reservation \
+         -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+         -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
       - name: Configure Maven settings.xml for Nexus
         run: |
           mkdir -p ~/.m2
@@ -49,3 +56,5 @@ jobs:
 
       - name: Upload Artifact to Nexus
         run: mvn deploy -DaltDeploymentRepository=nexus::default::${{ secrets.NEXUS_REPO_URL }}
+
+        
