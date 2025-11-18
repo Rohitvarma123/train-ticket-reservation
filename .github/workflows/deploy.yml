@@ -1,4 +1,4 @@
-name: Build & Deploy WAR + Upload to Nexus + Deploy to Tomcat
+name: Build and Deploy train-ticket-reservation
 
 on:
   push:
@@ -7,80 +7,45 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: ☕ Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 🔥 Create Nexus settings.xml
-      - name: Create Maven settings.xml
+      - name: 🔨 Build with Maven
+        run: mvn clean package -DskipTests
+
+      - name: 🗂 Find WAR file
+        run: echo "WAR_FILE=$(ls target/*.war | head -n 1)" >> $GITHUB_ENV
+
+      - name: ⬆ Upload WAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: war-file
+          path: ${{ env.WAR_FILE }}
+
+      - name: Configure Maven settings.xml for Nexus
         run: |
           mkdir -p ~/.m2
           cat <<EOF > ~/.m2/settings.xml
           <settings>
             <servers>
               <server>
-                <id>nexus-snapshots</id>
-                <username>${{ secrets.NEXUS_USERNAME }}</username>
-                <password>${{ secrets.NEXUS_PASSWORD }}</password>
-              </server>
-              <server>
-                <id>nexus-releases</id>
+                <id>nexus</id>
                 <username>${{ secrets.NEXUS_USERNAME }}</username>
                 <password>${{ secrets.NEXUS_PASSWORD }}</password>
               </server>
             </servers>
-
-            <mirrors>
-              <mirror>
-                <id>nexus</id>
-                <mirrorOf>*</mirrorOf>
-                <url>http://13.56.179.2:8082/repository/maven-public/</url>
-              </mirror>
-            </mirrors>
           </settings>
           EOF
 
-      # ⭐ BUILD WAR (pulls dependencies from Nexus)
-      - name: Build with Maven
-        run: mvn -B clean package --settings ~/.m2/settings.xml
-
-      # ⭐ Upload WAR to Nexus
-      - name: Deploy WAR to Nexus
-        run: mvn -B deploy -DskipTests --settings ~/.m2/settings.xml
-
-      # ⭐ Download WAR
-      - name: Download build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-war
-          path: target/*.war
-
-      # ⭐ UNDEPLOY OLD TOMCAT APP
-      - name: Cleanup old deployment
-        run: |
-          curl -s -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
-          "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/undeploy?path=/TrainBook"
-
-      # ⭐ DEPLOY NEW WAR TO TOMCAT
-      - name: Deploy new WAR
-        run: |
-          response=$(curl -s -w "%{http_code}" \
-          -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
-          -T target/*.war \
-          "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/deploy?path=/TrainBook&update=true")
-
-          echo "Tomcat response: $response"
-          [[ "$response" == *200* ]] || exit 1
-
-
-
-          
+      - name: Upload Artifact to Nexus
+        run: mvn deploy -DaltDeploymentRepository=nexus::default::${{ secrets.NEXUS_REPO_URL }}
