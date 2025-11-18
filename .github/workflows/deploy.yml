@@ -1,63 +1,82 @@
-name: Maven Build & Deploy to Nexus
+name: Build & Deploy WAR + Upload to Nexus + Deploy to Tomcat
 
 on:
   push:
-    branches: [ "master" ]
+    branches:
+      - master
   workflow_dispatch:
 
 jobs:
-  build:
+  build-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up JDK 11
-      uses: actions/setup-java@v3
-      with:
-        distribution: "temurin"
-        java-version: "11"
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-    # ------------------------------------------
-    # CREATE MAVEN settings.xml for Nexus
-    # ------------------------------------------
-    - name: Create Maven settings.xml
-      run: |
-        mkdir -p ~/.m2
-        cat > ~/.m2/settings.xml <<EOF
-        <settings>
-          <servers>
-            <server>
-              <id>nexus-snapshots</id>
-              <username>${{ secrets.NEXUS_USERNAME }}</username>
-              <password>${{ secrets.NEXUS_PASSWORD }}</password>
-            </server>
-            <server>
-              <id>nexus-releases</id>
-              <username>${{ secrets.NEXUS_USERNAME }}</username>
-              <password>${{ secrets.NEXUS_PASSWORD }}</password>
-            </server>
-          </servers>
+      # 🔥 Create Nexus settings.xml
+      - name: Create Maven settings.xml
+        run: |
+          mkdir -p ~/.m2
+          cat <<EOF > ~/.m2/settings.xml
+          <settings>
+            <servers>
+              <server>
+                <id>nexus-snapshots</id>
+                <username>${{ secrets.NEXUS_USERNAME }}</username>
+                <password>${{ secrets.NEXUS_PASSWORD }}</password>
+              </server>
+              <server>
+                <id>nexus-releases</id>
+                <username>${{ secrets.NEXUS_USERNAME }}</username>
+                <password>${{ secrets.NEXUS_PASSWORD }}</password>
+              </server>
+            </servers>
 
-          <mirrors>
-            <mirror>
-              <id>nexus</id>
-              <mirrorOf>*</mirrorOf>
-              <url>http://YOUR_NEXUS_URL:8081/repository/maven-public/</url>
-            </mirror>
-          </mirrors>
-        </settings>
-        EOF
+            <mirrors>
+              <mirror>
+                <id>nexus</id>
+                <mirrorOf>*</mirrorOf>
+                <url>http://13.56.179.2:8082/repository/maven-public/</url>
+              </mirror>
+            </mirrors>
+          </settings>
+          EOF
 
-    # ------------------------------------------
-    # BUILD THE PROJECT
-    # ------------------------------------------
-    - name: Build Maven Project
-      run: mvn -B clean package --settings ~/.m2/settings.xml
+      # ⭐ BUILD WAR (pulls dependencies from Nexus)
+      - name: Build with Maven
+        run: mvn -B clean package --settings ~/.m2/settings.xml
 
-    # ------------------------------------------
-    # DEPLOY TO NEXUS
-    # ------------------------------------------
-    - name: Deploy to Nexus
-      run: mvn -B deploy --settings ~/.m2/settings.xml
+      # ⭐ Upload WAR to Nexus
+      - name: Deploy WAR to Nexus
+        run: mvn -B deploy -DskipTests --settings ~/.m2/settings.xml
+
+      # ⭐ Download WAR
+      - name: Download build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-war
+          path: target/*.war
+
+      # ⭐ UNDEPLOY OLD TOMCAT APP
+      - name: Cleanup old deployment
+        run: |
+          curl -s -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
+          "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/undeploy?path=/TrainBook"
+
+      # ⭐ DEPLOY NEW WAR TO TOMCAT
+      - name: Deploy new WAR
+        run: |
+          response=$(curl -s -w "%{http_code}" \
+          -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
+          -T target/*.war \
+          "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/deploy?path=/TrainBook&update=true")
+
+          echo "Tomcat response: $response"
+          [[ "$response" == *200* ]] || exit 1
