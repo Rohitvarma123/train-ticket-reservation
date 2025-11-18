@@ -97,6 +97,30 @@ jobs:
           service: ${{ secrets.ECS_SERVICE }}
           cluster: ${{ secrets.ECS_CLUSTER }}
           wait-for-service-stability: true
+          # 7. Update kubeconfig for EKS
+      - name: Update kubeconfig
+        run: |
+         aws eks update-kubeconfig \
+          --name ${{ secrets.EKS_CLUSTER_NAME }} \
+          --region ${{ secrets.AWS_REGION }}
+          
+    # 🚀 CREATE NAMESPACE IF NOT PRESENT
+      - name: Apply namespace manifest
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/deployment.yaml -n ${{ secrets.K8S_NAMESPACE }}
+          kubectl apply -f k8s/service.yaml
+
+    # 8. Deploy to EKS
+      - name: Deploy to EKS
+        run: |
+         ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          kubectl set image deployment/train-ticket-deployment \
+            train-ticket-container=$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} \
+            -n ${{ secrets.K8S_NAMESPACE }}
+
+          kubectl rollout status deployment/train-ticket-deployment \
+            -n ${{ secrets.K8S_NAMESPACE }} --timeout=200s
 
 
 
