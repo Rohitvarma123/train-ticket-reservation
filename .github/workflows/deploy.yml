@@ -1,4 +1,4 @@
-name: Build WAR with Maven and Deploy Java App + Upload to Nexus
+name: Maven Build & Deploy to Nexus
 
 on:
   push:
@@ -6,78 +6,58 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout Code
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      # 2️⃣ Set up JDK 17
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+    - name: Set up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        distribution: "temurin"
+        java-version: "11"
 
-      # 3️⃣ Configure Maven settings.xml (IMPORTANT - FIXED)
-      - name: Configure Maven settings.xml
-        run: |
-          mkdir -p ~/.m2
-          cat <<EOF > ~/.m2/settings.xml
-          <settings>
-            <servers>
-              <server>
-                <id>nexus-snapshots</id>
-                <username>${{ secrets.NEXUS_USERNAME }}</username>
-                <password>${{ secrets.NEXUS_PASSWORD }}</password>
-              </server>
-            </servers>
-          </settings>
-          EOF
+    # ------------------------------------------
+    # CREATE MAVEN settings.xml for Nexus
+    # ------------------------------------------
+    - name: Create Maven settings.xml
+      run: |
+        mkdir -p ~/.m2
+        cat > ~/.m2/settings.xml <<EOF
+        <settings>
+          <servers>
+            <server>
+              <id>nexus-snapshots</id>
+              <username>${{ secrets.NEXUS_USERNAME }}</username>
+              <password>${{ secrets.NEXUS_PASSWORD }}</password>
+            </server>
+            <server>
+              <id>nexus-releases</id>
+              <username>${{ secrets.NEXUS_USERNAME }}</username>
+              <password>${{ secrets.NEXUS_PASSWORD }}</password>
+            </server>
+          </servers>
 
-      # 4️⃣ Build WAR
-      - name: Build with Maven
-        run: mvn clean package
+          <mirrors>
+            <mirror>
+              <id>nexus</id>
+              <mirrorOf>*</mirrorOf>
+              <url>http://YOUR_NEXUS_URL:8081/repository/maven-public/</url>
+            </mirror>
+          </mirrors>
+        </settings>
+        EOF
 
-      # 5️⃣ Deploy WAR to Nexus (SNAPSHOTS)
-      - name: Deploy to Nexus SNAPSHOT Repo
-        run: mvn deploy -DskipTests
+    # ------------------------------------------
+    # BUILD THE PROJECT
+    # ------------------------------------------
+    - name: Build Maven Project
+      run: mvn -B clean package --settings ~/.m2/settings.xml
 
-      # 6️⃣ Upload WAR to GitHub artifact
-      - name: Upload WAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-war
-          path: target/*.war
-
-      # 7️⃣ Download artifact before Tomcat deploy
-      - name: Download WAR artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: build-war
-          path: ./artifact
-
-      # 8️⃣ Undeploy old app from Tomcat
-      - name: Undeploy old version from Tomcat
-        run: |
-          curl -s -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
-          "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/undeploy?path=/TrainBook"
-
-      # 9️⃣ Deploy new WAR to Tomcat
-      - name: Deploy new WAR to Tomcat
-        run: |
-          WAR_FILE=$(ls ./artifact/*.war)
-          echo "Deploying $WAR_FILE to Tomcat..."
-
-          response=$(curl -s -w "%{http_code}" \
-            -u "${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }}" \
-            -T "$WAR_FILE" \
-            "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/deploy?path=/TrainBook&update=true")
-
-          echo "Tomcat Response: $response"
-          if [[ "$response" != *200* ]]; then
-            echo "Deployment to Tomcat FAILED!"
-            exit 1
-          fi
+    # ------------------------------------------
+    # DEPLOY TO NEXUS
+    # ------------------------------------------
+    - name: Deploy to Nexus
+      run: mvn -B deploy --settings ~/.m2/settings.xml
