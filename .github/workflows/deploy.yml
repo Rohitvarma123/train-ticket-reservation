@@ -1,4 +1,4 @@
-name: Build WAR with Maven and Deploy Java App to Tomcat on AWS EC2
+name: Build, Upload to Nexus & Deploy to Tomcat
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,52 +15,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Set up JDK 17
+      # 2️⃣ Set up Java
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 3️⃣ Build WAR using Maven
-      - name: Build with Maven
-        run: mvn clean package
-
-      # 4️⃣ Upload Artifact
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-war
-          path: target/*.war
-
-      # 5️⃣ Download Artifact for Deployment
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: build-war
-          path: ./artifact
-
-      # 6️⃣ Undeploy old version from Tomcat
-      - name: Cleanup old deployment
-        run: |
-          curl -s -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
-          "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/undeploy?path=/TrainBook"
-
-      # 7️⃣ Deploy new WAR file to Tomcat
-      - name: Deploy new WAR
-        run: |
-          response=$(curl -s -w "%{http_code}" \
-          -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
-          -T ./artifact/*.war \
-          "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/deploy?path=/TrainBook&update=true")
-
-          echo "Tomcat response: $response"
-          if [[ "$response" != *200* ]]; then
-            echo "Deployment failed!"
-            exit 1
-          fi
-          #       # 8️⃣ Upload WAR to Nexus SNAPSHOT Repo
-      - name: Create Maven settings.xml
+      # 3️⃣ Create Maven settings.xml for Nexus Auth
+      - name: Configure Maven settings.xml
         run: |
           mkdir -p ~/.m2
           cat <<EOF > ~/.m2/settings.xml
@@ -72,6 +35,7 @@ jobs:
                 <password>${{ secrets.NEXUS_PASSWORD }}</password>
               </server>
             </servers>
+
             <mirrors>
               <mirror>
                 <id>nexus</id>
@@ -82,38 +46,37 @@ jobs:
           </settings>
           EOF
 
-      - name: Build with Maven
-        run: mvn clean package
+      # 4️⃣ Build and Upload WAR to Nexus
+      - name: Build & Deploy to Nexus
+        run: mvn clean deploy -DskipTests
 
-      - name: Deploy WAR to Nexus
-        run: mvn deploy -DskipTests
+      # 5️⃣ Upload Artifact for Tomcat Deployment
+      - name: Upload WAR Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-war
+          path: target/*.war
 
-      - name: Download build artifact
+      # 6️⃣ Download Artifact for Tomcat Deployment
+      - name: Download WAR for Tomcat
         uses: actions/download-artifact@v4
         with:
           name: build-war
           path: ./artifact
 
-      - name: Cleanup old deployment on Tomcat
+      # 7️⃣ Undeploy old App
+      - name: Remove old deployment in Tomcat
         run: |
           curl -s -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
           "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/undeploy?path=/TrainBook"
 
-      - name: Deploy new WAR to Tomcat
+      # 8️⃣ Deploy new WAR to Tomcat
+      - name: Deploy WAR to Tomcat
         run: |
           response=$(curl -s -w "%{http_code}" \
           -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
           -T ./artifact/*.war \
           "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/deploy?path=/TrainBook&update=true")
+
           echo "Tomcat response: $response"
           [[ "$response" == *200* ]] || exit 1
-
-
-
-
-
-
-
-
-
-
