@@ -7,55 +7,55 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Checkout Code
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2️⃣ Set up JDK 17
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
+      # 3️⃣ Build WAR using Maven
       - name: Build with Maven
         run: mvn clean package
 
+      # 4️⃣ Upload Artifact
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: build-war
           path: target/*.war
 
----
+      # 5️⃣ Download Artifact for Deployment
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-war
+          path: ./artifact
 
-# Deploy to DEV
-deploy-dev:
-  runs-on: ubuntu-latest
-  needs: build
-  environment:
-    name: DEV
-  steps:
-    - name: Download build artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: build-war
-        path: ./artifact
+      # 6️⃣ Undeploy old version from Tomcat
+      - name: Cleanup old deployment
+        run: |
+          curl -s -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
+          "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/undeploy?path=/TrainBook"
 
-    - name: Cleanup old deployment on DEV
-      run: |
-        curl -s -u ${{ secrets.TOMCAT_USER_DEV }}:${{ secrets.TOMCAT_PASSWORD_DEV }} \
-        "http://${{ secrets.TOMCAT_HOST_DEV }}:8080/manager/text/undeploy?path=/TrainBook"
+      # 7️⃣ Deploy new WAR file to Tomcat
+      - name: Deploy new WAR
+        run: |
+          response=$(curl -s -w "%{http_code}" \
+          -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
+          -T ./artifact/*.war \
+          "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/deploy?path=/TrainBook&update=true")
 
-    - name: Deploy new WAR to DEV
-      run: |
-        response=$(curl -s -w "%{http_code}" -u ${{ secrets.TOMCAT_USER_DEV }}:${{ secrets.TOMCAT_PASSWORD_DEV }} \
-        -T ./artifact/*.war \
-        "http://${{ secrets.TOMCAT_HOST_DEV }}:8080/manager/text/deploy?path=/TrainBook&update=true")
-        echo "Tomcat response: $response"
-        if [[ "$response" != *200* ]]; then
-          echo "Deployment failed"
-          exit 1
-        fi
+          echo "Tomcat response: $response"
+          if [[ "$response" != *200* ]]; then
+            echo "Deployment failed!"
+            exit 1
+          fi
