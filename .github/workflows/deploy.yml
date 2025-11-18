@@ -60,21 +60,60 @@ jobs:
             exit 1
           fi
           #       # 8️⃣ Upload WAR to Nexus SNAPSHOT Repo
-      - name: Upload WAR to Nexus Repository
+      - name: Create Maven settings.xml
         run: |
-          WAR_FILE=$(ls ./artifact/*.war)
+          mkdir -p ~/.m2
+          cat <<EOF > ~/.m2/settings.xml
+          <settings>
+            <servers>
+              <server>
+                <id>nexus-snapshots</id>
+                <username>${{ secrets.NEXUS_USERNAME }}</username>
+                <password>${{ secrets.NEXUS_PASSWORD }}</password>
+              </server>
+            </servers>
+            <mirrors>
+              <mirror>
+                <id>nexus</id>
+                <mirrorOf>*</mirrorOf>
+                <url>${{ secrets.NEXUS_URL }}/repository/maven-public/</url>
+              </mirror>
+            </mirrors>
+          </settings>
+          EOF
 
-          GROUP_ID="TrainBook"
-          ARTIFACT_ID="TrainBook"
-          VERSION="1.0.0-SNAPSHOT"
+      - name: Build with Maven
+        run: mvn clean package
 
-          TARGET_URL="${{ secrets.NEXUS_URL }}/repository/${{ secrets.NEXUS_REPO }}/$GROUP_ID/$ARTIFACT_ID/$VERSION/${ARTIFACT_ID}-${VERSION}.war"
+      - name: Deploy WAR to Nexus
+        run: mvn deploy -DskipTests
 
-          echo "Uploading to Nexus at: $TARGET_URL"
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-war
+          path: ./artifact
 
-          curl -v --user "${{ secrets.NEXUS_USERNAME }}:${{ secrets.NEXUS_PASSWORD }}" \
-            --upload-file "$WAR_FILE" \
-            "$TARGET_URL"
+      - name: Cleanup old deployment on Tomcat
+        run: |
+          curl -s -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
+          "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/undeploy?path=/TrainBook"
 
-          
+      - name: Deploy new WAR to Tomcat
+        run: |
+          response=$(curl -s -w "%{http_code}" \
+          -u ${{ secrets.TOMCAT_USER }}:${{ secrets.TOMCAT_PASSWORD }} \
+          -T ./artifact/*.war \
+          "http://${{ secrets.TOMCAT_HOST }}:8080/manager/text/deploy?path=/TrainBook&update=true")
+          echo "Tomcat response: $response"
+          [[ "$response" == *200* ]] || exit 1
+
+
+
+
+
+
+
+
+
 
