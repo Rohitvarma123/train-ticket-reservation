@@ -59,3 +59,16 @@ jobs:
             echo "Deployment failed!"
             exit 1
           fi
+          # 4️⃣ Upload WAR to Nexus
+      - name: Upload WAR to Nexus Repository
+        run: |
+          WAR_FILE=$(ls target/*.war)
+          echo "Uploading $WAR_FILE to Nexus..."
+
+          curl -v --user "${{ secrets.NEXUS_USERNAME }}:${{ secrets.NEXUS_PASSWORD }}" \
+          --upload-file "$WAR_FILE" \
+          "${{ secrets.NEXUS_URL }}/repository/${{ secrets.NEXUS_REPO }}/com/trainbook/app/1.0.0/app-1.0.0.war"
+
+
+          
+
