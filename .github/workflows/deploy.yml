@@ -59,16 +59,22 @@ jobs:
             echo "Deployment failed!"
             exit 1
           fi
-          # 4️⃣ Upload WAR to Nexus
+          #       # 8️⃣ Upload WAR to Nexus SNAPSHOT Repo
       - name: Upload WAR to Nexus Repository
         run: |
-          WAR_FILE=$(ls target/*.war)
-          echo "Uploading $WAR_FILE to Nexus..."
+          WAR_FILE=$(ls ./artifact/*.war)
+
+          GROUP_ID="TrainBook"
+          ARTIFACT_ID="TrainBook"
+          VERSION="1.0.0-SNAPSHOT"
+
+          TARGET_URL="${{ secrets.NEXUS_URL }}/repository/${{ secrets.NEXUS_REPO }}/$GROUP_ID/$ARTIFACT_ID/$VERSION/${ARTIFACT_ID}-${VERSION}.war"
+
+          echo "Uploading to Nexus at: $TARGET_URL"
 
           curl -v --user "${{ secrets.NEXUS_USERNAME }}:${{ secrets.NEXUS_PASSWORD }}" \
-          --upload-file "$WAR_FILE" \
-          "${{ secrets.NEXUS_URL }}/repository/${{ secrets.NEXUS_REPO }}/com/trainbook/app/1.0.0/app-1.0.0.war"
-
+            --upload-file "$WAR_FILE" \
+            "$TARGET_URL"
 
           
 
