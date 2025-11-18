@@ -80,3 +80,7 @@ jobs:
 
           echo "Tomcat response: $response"
           [[ "$response" == *200* ]] || exit 1
+
+
+
+          
