@@ -2,7 +2,7 @@ name: Full CI-CD (Frontend + Backend)
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "main" ]
 
 jobs:
   build-and-deploy:
@@ -62,9 +62,13 @@ jobs:
         ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/my-frontend:latest
 
 
-    # -------------------- INSTALL kubectl (AWS ACTION) --------------------
-    - name: Setup kubectl
-      uses: aws-actions/amazon-eks-kubectl@v1
+    # -------------------- INSTALL kubectl MANUALLY (WORKS 100%) --------------------
+    - name: Install kubectl
+      run: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        sudo mv kubectl /usr/local/bin/
+        kubectl version --client
 
 
     # -------------------- UPDATE KUBECONFIG --------------------
@@ -87,15 +91,5 @@ jobs:
     - name: Update Frontend Deployment
       run: |
         kubectl set image deployment/frontend \
-        frontend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-frontend:latest
+        frontend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/my-frontend:latest
         kubectl rollout status deployment/frontend
-
-
-
-
-
-
-        
-
-
-        
