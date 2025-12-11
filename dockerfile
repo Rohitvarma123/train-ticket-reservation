@@ -1,15 +1,19 @@
-# Use official Apache Tomcat base image with JDK 17
-FROM tomcat:9.0-jdk17
+FROM node:18-alpine AS backend
+WORKDIR /backend
+COPY backend/package*.json .
+RUN npm install
+COPY backend .
+CMD ["npm", "start"]
 
-# Remove default Tomcat apps (optional, for a clean slate)
-RUN rm -rf /usr/local/tomcat/webapps/*
+FROM node:18-alpine AS frontend
+WORKDIR /frontend
+COPY frontend/package*.json .
+RUN npm install
+COPY frontend .
+RUN npm run build
 
-# Copy your WAR file into the Tomcat webapps directory
-# Rename it to ROOT.war for root path deployment
-COPY target/TrainBook-1.0.0-SNAPSHOT.war /usr/local/tomcat/webapps/ROOT.war
+# final container
+FROM nginx:alpine
+COPY --from=frontend /frontend/build /usr/share/nginx/html
+COPY --from=backend /backend /app/backend
 
-# Expose default Tomcat port
-EXPOSE 8080
-
-# Start Tomcat (default CMD in base image)
-CMD ["catalina.sh", "run"]
