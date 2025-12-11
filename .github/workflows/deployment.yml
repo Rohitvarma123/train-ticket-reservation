@@ -1,20 +1,20 @@
-name: Full CI-CD (Frontend + Backend)
+name: Full CI-CD Pipeline (Backend + Frontend)
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["main"]
 
 jobs:
-  build-and-deploy:
+  build-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    # -------------------- CHECKOUT CODE --------------------
-    - name: Checkout Code
+
+    # ---------------- CHECKOUT CODE ----------------
+    - name: Checkout Repository
       uses: actions/checkout@v3
 
-
-    # -------------------- CONFIGURE AWS --------------------
+    # ---------------- AWS AUTHENTICATION ----------------
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v2
       with:
@@ -22,18 +22,19 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ap-northeast-1
 
-
-    # -------------------- LOGIN TO ECR --------------------
+    # ---------------- LOGIN TO ECR ----------------
     - name: Login to ECR
       run: |
-        aws ecr get-login-password --region ap-south-1 \
-        | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
+        aws ecr get-login-password --region ap-northeast-1 \
+        | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com
 
 
-    # -------------------- BUILD BACKEND IMAGE --------------------
+    # ==========================================================
+    #                      BACKEND
+    # ==========================================================
     - name: Build Backend Image
       run: |
-        docker build -t backend:latest ./backend
+        docker build -t backend ./backend
 
     - name: Tag Backend Image
       run: |
@@ -46,10 +47,12 @@ jobs:
         ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-backend:latest
 
 
-    # -------------------- BUILD FRONTEND IMAGE --------------------
+    # ==========================================================
+    #                      FRONTEND
+    # ==========================================================
     - name: Build Frontend Image
       run: |
-        docker build -t frontend:latest ./frontend
+        docker build -t frontend ./frontend
 
     - name: Tag Frontend Image
       run: |
@@ -62,8 +65,10 @@ jobs:
         ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-frontend:latest
 
 
-    # -------------------- INSTALL kubectl MANUALLY (WORKS 100%) --------------------
-    - name: Install kubectl
+    # ==========================================================
+    #                   INSTALL KUBECTL
+    # ==========================================================
+    - name: Install kubectl (Latest)
       run: |
         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
         chmod +x kubectl
@@ -71,7 +76,9 @@ jobs:
         kubectl version --client
 
 
-    # -------------------- UPDATE KUBECONFIG --------------------
+    # ==========================================================
+    #                   UPDATE KUBECONFIG
+    # ==========================================================
     - name: Update Kubeconfig
       run: |
         aws eks update-kubeconfig \
@@ -79,19 +86,27 @@ jobs:
           --name my-eks-cluster
 
 
-    # -------------------- DEPLOY BACKEND TO EKS --------------------
-    - name: Update Backend Deployment
+    # ==========================================================
+    #                 DEPLOY TO EKS
+    # ==========================================================
+
+    # BACKEND DEPLOYMENT
+    - name: Deploy Backend to EKS
       run: |
-        kubectl set image deployment/backend \
-        backend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-backend:latest
-        kubectl rollout status deployment/backend
+        kubectl set image deployment/deploymentbackend \
+        deploymentbackend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-backend:latest
+        kubectl rollout status deployment/deploymentbackend
 
 
-    # -------------------- DEPLOY FRONTEND TO EKS --------------------
-    - name: Update Frontend Deployment
+    # FRONTEND DEPLOYMENT
+    - name: Deploy Frontend to EKS
       run: |
-        kubectl set image deployment/frontend \
-        frontend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-frontend:latest
-        kubectl rollout status deployment/frontend
+        kubectl set image deployment/deploymentfrontend \
+        deploymentfrontend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-frontend:latest
+        kubectl rollout status deployment/deploymentfrontend
 
 
+
+
+
+        
