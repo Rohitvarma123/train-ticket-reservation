@@ -106,3 +106,7 @@ jobs:
         kubectl set image deployment/deploymentfrontend \
         deploymentfrontend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-frontend:latest
         kubectl rollout status deployment/deploymentfrontend
+
+
+
+        
