@@ -1,4 +1,4 @@
-name: Full CI-CD Pipeline (Backend + Frontend)
+name: Full CI-CD Pipeline (Backend + Frontend with Debug)
 
 on:
   push:
@@ -14,6 +14,14 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v3
 
+    # ---------------- DEBUG: List repository files ----------------
+    - name: List repository files
+      run: |
+        echo "Current directory:"
+        pwd
+        echo "List all files and folders recursively:"
+        ls -R
+
     # ---------------- AWS AUTHENTICATION ----------------
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v2
@@ -27,7 +35,6 @@ jobs:
       run: |
         aws ecr get-login-password --region ap-northeast-1 \
         | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com
-
 
     # ==========================================================
     #                      BACKEND
@@ -46,7 +53,6 @@ jobs:
         docker push \
         ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-backend:latest
 
-
     # ==========================================================
     #                      FRONTEND
     # ==========================================================
@@ -64,7 +70,6 @@ jobs:
         docker push \
         ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-frontend:latest
 
-
     # ==========================================================
     #                   INSTALL KUBECTL
     # ==========================================================
@@ -75,7 +80,6 @@ jobs:
         sudo mv kubectl /usr/local/bin/
         kubectl version --client
 
-
     # ==========================================================
     #                   UPDATE KUBECONFIG
     # ==========================================================
@@ -84,7 +88,6 @@ jobs:
         aws eks update-kubeconfig \
           --region ap-northeast-1 \
           --name my-eks-cluster
-
 
     # ==========================================================
     #                 DEPLOY TO EKS
@@ -97,16 +100,9 @@ jobs:
         deploymentbackend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-backend:latest
         kubectl rollout status deployment/deploymentbackend
 
-
     # FRONTEND DEPLOYMENT
     - name: Deploy Frontend to EKS
       run: |
         kubectl set image deployment/deploymentfrontend \
         deploymentfrontend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-frontend:latest
         kubectl rollout status deployment/deploymentfrontend
-
-
-
-
-
-        
