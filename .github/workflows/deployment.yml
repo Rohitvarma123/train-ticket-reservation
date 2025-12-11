@@ -20,7 +20,7 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ap-south-1
+        aws-region: ap-northeast-1
 
 
     # -------------------- LOGIN TO ECR --------------------
@@ -38,12 +38,12 @@ jobs:
     - name: Tag Backend Image
       run: |
         docker tag backend:latest \
-        ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/my-backend:latest
+        ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-backend:latest
 
     - name: Push Backend Image
       run: |
         docker push \
-        ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/my-backend:latest
+        ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-backend:latest
 
 
     # -------------------- BUILD FRONTEND IMAGE --------------------
@@ -54,12 +54,12 @@ jobs:
     - name: Tag Frontend Image
       run: |
         docker tag frontend:latest \
-        ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/my-frontend:latest
+        ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-frontend:latest
 
     - name: Push Frontend Image
       run: |
         docker push \
-        ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/my-frontend:latest
+        ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-frontend:latest
 
 
     # -------------------- INSTALL kubectl MANUALLY (WORKS 100%) --------------------
@@ -75,7 +75,7 @@ jobs:
     - name: Update Kubeconfig
       run: |
         aws eks update-kubeconfig \
-          --region ap-south-1 \
+          --region ap-northeast-1 \
           --name my-eks-cluster
 
 
@@ -83,7 +83,7 @@ jobs:
     - name: Update Backend Deployment
       run: |
         kubectl set image deployment/backend \
-        backend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/my-backend:latest
+        backend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-backend:latest
         kubectl rollout status deployment/backend
 
 
@@ -91,8 +91,22 @@ jobs:
     - name: Update Frontend Deployment
       run: |
         kubectl set image deployment/frontend \
-        frontend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/my-frontend:latest
+        frontend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-frontend:latest
         kubectl rollout status deployment/frontend
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
 
 
 
