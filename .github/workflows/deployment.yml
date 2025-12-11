@@ -41,7 +41,8 @@ jobs:
     # ==========================================================
     - name: Build Backend Image
       run: |
-        docker build -t backend ./backend
+       docker build -t backend -f Dockerfile ../backend
+
 
     - name: Tag Backend Image
       run: |
