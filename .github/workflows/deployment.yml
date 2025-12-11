@@ -87,5 +87,15 @@ jobs:
     - name: Update Frontend Deployment
       run: |
         kubectl set image deployment/frontend \
-        frontend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/my-frontend:latest
+        frontend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-1.amazonaws.com/my-frontend:latest
         kubectl rollout status deployment/frontend
+
+
+
+
+
+
+        
+
+
+        
