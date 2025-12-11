@@ -2,7 +2,7 @@ name: Full CI-CD Pipeline (Backend + Frontend)
 
 on:
   push:
-    branches: ["main"]
+    branches: ["master"]
 
 jobs:
   build-deploy:
