@@ -19,8 +19,7 @@ spec:
     spec:
       containers:
       - name: train-ticket-reservation
-
-        image: 422261031406.dkr.ecr.ap-northeast-1.amazonaws.com/ecr-repo:1785409772
-
+        image: IMAGE_NAME
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
