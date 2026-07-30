@@ -5,12 +5,11 @@ metadata:
   name: train-ticket-service
 
 spec:
-  type: LoadBalancer
-
   selector:
     app: train-ticket-reservation
 
   ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 8080
+    - port: 80
+      targetPort: 8080
+
+  type: LoadBalancer
