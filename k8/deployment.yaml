@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: train-ticket-reservation
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: train-ticket-reservation
+
+  template:
+    metadata:
+      labels:
+        app: train-ticket-reservation
+
+    spec:
+      containers:
+      - name: train-ticket-reservation
+
+        image: 422261031406.dkr.ecr.ap-northeast-1.amazonaws.com/ecr-repo:1785409772
+
+        ports:
+        - containerPort: 8080
