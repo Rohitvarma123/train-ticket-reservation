@@ -5,7 +5,7 @@ metadata:
   name: train-ticket-reservation
 
 spec:
-  replicas: 2
+  replicas: 3
 
   selector:
     matchLabels:
@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: train-ticket-reservation
-        image: IMAGE_NAME
+        image: 422261031406.dkr.ecr.ap-northeast-1.amazonaws.com/ecr-repo:1785413186
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
