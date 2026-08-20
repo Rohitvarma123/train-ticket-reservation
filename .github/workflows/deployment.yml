@@ -1,4 +1,4 @@
-name: CI/CD Pipeline with SonarQube
+name: CI/CD Pipeline with SonarQube and Snyk
 
 on:
   push:
@@ -10,6 +10,9 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
 
     steps:
 
@@ -42,12 +45,24 @@ jobs:
         run: mvn test
 
 
-      # 6. Package
+      # 6. Setup Snyk CLI
+      - name: Setup Snyk
+        uses: snyk/actions/setup@master
+
+
+      # 7. Snyk Code Security Scan
+      - name: Snyk Code Scan
+        run: snyk code test --severity-threshold=high
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+
+      # 8. Package
       - name: Package
         run: mvn package
 
 
-      # 7. SonarQube Scan
+      # 9. SonarQube Scan
       - name: SonarQube Scan
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
