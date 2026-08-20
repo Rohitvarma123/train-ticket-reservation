@@ -10,17 +10,23 @@ on:
       - master
 
 jobs:
+
   build:
 
     runs-on: ubuntu-latest
 
     steps:
 
+      # --------------------------------------------------
       # 1. Checkout source code
+      # --------------------------------------------------
       - name: Checkout Source
         uses: actions/checkout@v4
 
+
+      # --------------------------------------------------
       # 2. Setup Java 17
+      # --------------------------------------------------
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
@@ -28,18 +34,50 @@ jobs:
           java-version: '17'
           cache: maven
 
-      # 3. Build the application
-      - name: Build Project
-        run: mvn clean verify
 
-      # 4. SonarQube Scan
-      - name: SonarQube Scan
+      # --------------------------------------------------
+      # 3. Check Java and Maven
+      # --------------------------------------------------
+      - name: Check Java and Maven
+        run: |
+          java -version
+          mvn -version
+
+
+      # --------------------------------------------------
+      # 4. Build application
+      # --------------------------------------------------
+      - name: Build Project
+        run: |
+          mvn clean verify
+
+
+      # --------------------------------------------------
+      # 5. Check SonarQube server
+      # --------------------------------------------------
+      - name: Check SonarQube Server
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
-          mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+          echo "Checking SonarQube server..."
+
+          curl -f "$SONAR_HOST_URL/api/system/status"
+
+          echo
+          echo "SonarQube server is reachable."
+
+
+      # --------------------------------------------------
+      # 6. SonarQube Code Analysis
+      # --------------------------------------------------
+      - name: SonarQube Scan
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+        run: |
+          mvn org.sonarsource.scanner.maven:sonar-maven-plugin:5.7.0.6970:sonar \
             -Dsonar.projectKey=trian \
-            -Dsonar.projectName=train \
+            -Dsonar.projectName=TrainBook \
             -Dsonar.host.url="$SONAR_HOST_URL" \
             -Dsonar.token="$SONAR_TOKEN"
