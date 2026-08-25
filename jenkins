@@ -1,1 +1,49 @@
-
+pipeline {
+    agent any
+    stages{
+        stage('checkout') {
+            steps {
+                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/Rohitvarma123/train-ticket-reservation.git']])
+            }
+        }
+        stage('validate'){
+            steps {
+                sh 'mvn validate'
+            }
+        }
+        stage('compile'){
+            steps {
+                sh 'mvn compile'
+            }
+        }
+        stage('test'){
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('package'){
+            steps {
+                sh 'mvn package'
+            }
+        }
+        stage('sonar & scanner'){
+            steps {
+                sh '''mvn clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+                        -Dsonar.projectKey=project \
+                        -Dsonar.projectName='project' \
+                        -Dsonar.host.url=http://13.58.201.16:9000 \
+                        -Dsonar.token=sqp_19e4f9d05511e69384cb1cbc80c58b1f7105ac16'''
+            }
+        }
+        stage('nexus artifact'){
+            steps{
+                nexusArtifactUploader artifacts: [[artifactId: 'TrainBook', classifier: '', file: '/var/lib/jenkins/workspace/first-pipeline/target/TrainBook-1.0.0-SNAPSHOT.war', type: 'war']], credentialsId: 'nexus', groupId: 'TrainBook', nexusUrl: '13.58.201.16:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'maven-snapshots', version: '1.0.0-SNAPSHOT'
+            }
+        }
+        stage('deploy to tomcat'){
+            steps{
+                deploy adapters: [tomcat9(alternativeDeploymentContext: '', credentialsId: 'tomcat', path: '', url: 'http://13.58.201.16:8080')], contextPath: 'Rohit', war: '**/*.war'
+            }
+        }
+    }
+}
